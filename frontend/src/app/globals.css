@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-cream-light: #FAF8F2;
+  --color-cream-DEFAULT: #F6F4EB;
+  --color-cream: #F6F4EB;
+  --color-charcoal-light: #33322E;
+  --color-charcoal-DEFAULT: #1C1B18;
+  --color-charcoal: #1C1B18;
+  --color-coral-DEFAULT: #FF5E1A;
+  --color-coral: #FF5E1A;
+  --color-coral-hover: #E04E10;
+  --color-forest-DEFAULT: #378E56;
+  --color-forest: #378E56;
+  --color-sand-DEFAULT: #E6E3D8;
+  --color-sand: #E6E3D8;
+
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+}
+
+:root {
+  --bg-cream: #F6F4EB;
+  --bg-card: #FFFFFF;
+  --text-primary: #1C1B18;
+  --text-muted: #6E6C64;
+  --accent-coral: #FF5E1A;
+  --accent-coral-hover: #E04E10;
+  --accent-green: #378E56;
+  --border-color: #E6E3D8;
+  --border-color-focus: #1C1B18;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 2px 8px rgba(28, 27, 24, 0.02);
+  --shadow-md: 0 6px 20px rgba(28, 27, 24, 0.04);
+}
+
+/* Tabular figures for counters */
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+body {
+  background-color: var(--bg-cream);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-cream);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: var(--radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
