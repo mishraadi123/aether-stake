@@ -162,7 +162,10 @@ export function AetherWalletProvider({ children }) {
 
   // Map raw contract traps (simulation/execution panics) to human messages.
   const mapTrapError = (actionName, raw) => {
-    if (!raw || !/InvalidAction|UnreachableCodeReached|trapped/i.test(raw)) return null;
+    if (!raw) return null;
+    if (/user (declined|denied|rejected)|declined access|denied by the user|rejected by the user|cancel(l)?ed by (the )?user/i.test(raw))
+      return `Signature request rejected — you dismissed the wallet prompt, so "${actionName}" was not broadcast. No funds moved.`;
+    if (!/InvalidAction|UnreachableCodeReached|trapped/i.test(raw)) return null;
     if (actionName.startsWith("Acquire Coupon"))
       return "The active cycle has concluded — entry coupons can no longer be acquired. Settle the pool to draw the winner.";
     if (actionName === "Draw Winner")
