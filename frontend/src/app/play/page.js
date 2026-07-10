@@ -1,36 +1,43 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useWallet } from "../../context/WalletContext";
-import { buildBuyTicketTx, buildApproveTx, buildSettleRoundTx, buildOpenRoundTx, fromStroops, toStroops } from "../../utils/stellar";
-import { Ticket, Wallet, Clock, CheckCircle2, AlertTriangle, Coins, ShieldAlert, ArrowRight, ExternalLink, Settings } from "lucide-react";
+import { useAetherWallet } from "../../modules/wallet/WalletProvider";
+import {
+  constructBuyTicketTx,
+  constructApproveTx,
+  constructSettleRoundTx,
+  constructOpenRoundTx,
+  convertStroopsToXlm,
+  convertXlmToStroops
+} from "../../core/stellar/client";
+import { Ticket, Wallet, Clock, CheckCircle2, AlertTriangle, Coins, Settings, Minus, Plus } from "lucide-react";
 
 export default function Play() {
   const {
-    pubKey,
-    balance,
-    allowance,
-    userTickets,
-    roundInfo,
-    adminAddress,
-    loading,
-    errorMsg,
-    successMsg,
-    setErrorMsg,
-    setSuccessMsg,
-    connectWallet,
-    executeTransaction,
-    refreshData
-  } = useWallet();
+    connectedAddress,
+    xlmBalance,
+    approvedSpendLimit,
+    userAllocatedCoupons,
+    cycleDetails,
+    administratorAddress,
+    isProcessing,
+    processError,
+    processSuccess,
+    setProcessError,
+    setProcessSuccess,
+    establishConnection,
+    signAndSubmitTx,
+    syncStateData
+  } = useAetherWallet();
 
-  const [ticketQty, setTicketQty] = useState(1);
+  const [couponQty, setCouponQty] = useState(1);
   const [timeLeft, setTimeLeft] = useState("");
   const [isExpired, setIsExpired] = useState(false);
   const [openDuration, setOpenDuration] = useState(60);
 
   // Countdown timer logic
   useEffect(() => {
-    if (roundInfo.close_time === 0 || roundInfo.status !== 1) {
+    if (cycleDetails.close_time === 0 || cycleDetails.status !== 1) {
       setTimeLeft("");
       setIsExpired(false);
       return;
@@ -38,10 +45,10 @@ export default function Play() {
 
     const interval = setInterval(() => {
       const now = Math.floor(Date.now() / 1000);
-      const difference = roundInfo.close_time - now;
+      const difference = cycleDetails.close_time - now;
 
       if (difference <= 0) {
-        setTimeLeft("00:00 - Ended");
+        setTimeLeft("00:00 - Closed");
         setIsExpired(true);
         clearInterval(interval);
       } else {
@@ -53,40 +60,39 @@ export default function Play() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [roundInfo.close_time, roundInfo.status]);
+  }, [cycleDetails.close_time, cycleDetails.status]);
 
-  const pricePerTicket = roundInfo.ticket_price ? BigInt(roundInfo.ticket_price) : 0n;
-  const totalCostStroops = pricePerTicket * BigInt(ticketQty);
+  const pricePerCoupon = cycleDetails.ticket_price ? BigInt(cycleDetails.ticket_price) : 0n;
+  const totalCostStroops = pricePerCoupon * BigInt(couponQty);
 
   // Buy Ticket action
-  const handleBuyTickets = async () => {
-    setErrorMsg("");
-    setSuccessMsg("");
+  const handleBuyCoupons = async () => {
+    setProcessError("");
+    setProcessSuccess("");
 
-    if (!pubKey) {
-      setErrorMsg("Please connect your wallet first!");
+    if (!connectedAddress) {
+      setProcessError("Please connect your wallet first!");
       return;
     }
 
-    if (Math.floor(Date.now() / 1000) >= roundInfo.close_time) {
-      setErrorMsg("The round timer has expired — no more tickets can be purchased. Settle the round to draw the winner.");
+    if (Math.floor(Date.now() / 1000) >= cycleDetails.close_time) {
+      setProcessError("The round timer has expired — no more coupons can be acquired. Settle the cycle to draw the winner.");
       return;
     }
 
-    const userBalanceStroops = toStroops(parseFloat(balance));
+    const userBalanceStroops = convertXlmToStroops(parseFloat(xlmBalance));
     if (userBalanceStroops < totalCostStroops) {
-      setErrorMsg(`Insufficient XLM balance! You need at least ${fromStroops(totalCostStroops)} XLM, but you only have ${balance} XLM.`);
+      setProcessError(`Insufficient XLM balance! You need at least ${convertStroopsToXlm(totalCostStroops)} XLM, but you only have ${xlmBalance} XLM.`);
       return;
     }
 
     // Determine if allowance is sufficient
-    const currentAllowance = BigInt(allowance);
+    const currentAllowance = BigInt(approvedSpendLimit);
     if (currentAllowance < totalCostStroops) {
       // Need to approve first
-      await executeTransaction(
-        () => buildApproveTx(pubKey, totalCostStroops),
+      await signAndSubmitTx(
+        () => constructApproveTx(connectedAddress, totalCostStroops),
         async () => {
-          // Wait 2 seconds for ledger state propagation before buying
           await new Promise((r) => setTimeout(r, 2000));
           await buyStep();
         },
@@ -98,301 +104,299 @@ export default function Play() {
   };
 
   const buyStep = async () => {
-    // Loop to buy the requested number of tickets
-    for (let i = 0; i < ticketQty; i++) {
-      // The timer may run out mid-batch — re-check before each purchase
-      if (Math.floor(Date.now() / 1000) >= roundInfo.close_time) {
-        setErrorMsg(`Round closed after ${i} of ${ticketQty} tickets — no more entries allowed. Settle the round to draw the winner.`);
+    for (let i = 0; i < couponQty; i++) {
+      if (Math.floor(Date.now() / 1000) >= cycleDetails.close_time) {
+        setProcessError(`Cycle closed after ${i} of ${couponQty} coupons — no more entries allowed. Settle the cycle to draw the winner.`);
         return;
       }
-      const ok = await executeTransaction(
-        () => buildBuyTicketTx(pubKey, roundInfo.round_id),
+      const ok = await signAndSubmitTx(
+        () => constructBuyTicketTx(connectedAddress, cycleDetails.round_id),
         () => {
-          setSuccessMsg(`Successfully bought ticket #${i + 1} of ${ticketQty}!`);
+          setProcessSuccess(`Successfully acquired coupon #${i + 1} of ${couponQty}!`);
         },
-        `Buy Ticket ${i + 1}/${ticketQty}`
+        `Acquire Coupon ${i + 1}/${couponQty}`
       );
-      // Stop the batch on the first failure — the error is already displayed
       if (!ok) return;
-      if (ticketQty > 1 && i < ticketQty - 1) {
-        // Wait between multi-mints to prevent transaction submission sequence overlap
+      if (couponQty > 1 && i < couponQty - 1) {
         await new Promise((r) => setTimeout(r, 2500));
       }
     }
   };
 
   const handleSettle = async () => {
-    await executeTransaction(
-      () => buildSettleRoundTx(pubKey, roundInfo.round_id),
+    await signAndSubmitTx(
+      () => constructSettleRoundTx(connectedAddress, cycleDetails.round_id),
       () => {
-        setSuccessMsg("Round settled successfully!");
+        setProcessSuccess("Draw resolved and winner selected successfully!");
       },
-      "Settle Round"
+      "Draw Winner"
     );
   };
 
   const handleOpenRound = async () => {
-    if (roundInfo.status === 1 && !isExpired) {
-      setErrorMsg("A round is already active! Settle it first before opening a new round.");
+    if (cycleDetails.status === 1 && !isExpired) {
+      setProcessError("A sweepstakes cycle is already active! Settle it first before opening a new cycle.");
       return;
     }
-    await executeTransaction(
-      () => buildOpenRoundTx(pubKey, openDuration),
+    await signAndSubmitTx(
+      () => constructOpenRoundTx(connectedAddress, openDuration),
       () => {
-        setSuccessMsg(`Successfully opened Round #${roundInfo.round_id + 1}!`);
+        setProcessSuccess(`Successfully opened Cycle #${cycleDetails.round_id + 1}!`);
       },
-      "Open Round"
+      "Begin Cycle"
     );
   };
 
   return (
-    <div className="max-w-4xl mx-auto w-full py-6 flex flex-col gap-8 animate-fade-in">
-      
+    <div className="max-w-5xl mx-auto w-full flex flex-col gap-6 animate-fade-in">
+
+      {/* Page heading */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="np-display text-2xl sm:text-3xl">Enter the draw</h1>
+          <p className="np-mono text-[11px] uppercase tracking-wider text-ink-soft mt-1.5">
+            Acquire coupons → wait for zero → anyone settles
+          </p>
+        </div>
+        <span className="np-chip np-chip-ink">Cycle #{cycleDetails.round_id || "—"}</span>
+      </div>
+
       {/* Dynamic Alerts */}
-      {errorMsg && (
-        <div className="p-4 bg-[#FFF0EE] border border-[#FFD2CC] text-[#D44E30] rounded-2xl flex items-start gap-3 shadow-sm">
-          <AlertTriangle className="w-5.5 h-5.5 mt-0.5 flex-shrink-0" />
+      {processError && (
+        <div className="np-card-flat border-alarm bg-paper p-4 flex items-start gap-3 shadow-[5px_5px_0_0_var(--alarm)]" role="alert">
+          <AlertTriangle className="w-5 h-5 text-alarm flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1C1B18]">Transaction Refused</h4>
-            <p className="text-[11px] mt-1 leading-relaxed">{errorMsg}</p>
+            <h4 className="np-mono text-[11px] font-bold uppercase tracking-widest text-alarm">Transaction Refused</h4>
+            <p className="text-xs mt-1 leading-relaxed">{processError}</p>
           </div>
         </div>
       )}
 
-      {successMsg && (
-        <div className="p-4 bg-[#ECF7F0] border border-[#CDEBD8] text-[#378E56] rounded-2xl flex items-start gap-3 shadow-sm">
-          <CheckCircle2 className="w-5.5 h-5.5 mt-0.5 flex-shrink-0" />
+      {processSuccess && (
+        <div className="np-card-flat border-mint bg-paper p-4 flex items-start gap-3 shadow-[5px_5px_0_0_var(--mint)]" role="status">
+          <CheckCircle2 className="w-5 h-5 text-mint flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#1C1B18]">Success</h4>
-            <p className="text-[11px] mt-1 leading-relaxed">{successMsg}</p>
+            <h4 className="np-mono text-[11px] font-bold uppercase tracking-widest text-mint">Operation Complete</h4>
+            <p className="text-xs mt-1 leading-relaxed">{processSuccess}</p>
           </div>
         </div>
       )}
 
       {/* Connection Gate */}
-      {!pubKey ? (
-        <div className="bg-white border border-[#EBE9E1] rounded-3xl p-8 sm:p-12 text-center shadow-sm flex flex-col items-center gap-6">
-          <Wallet className="w-12 h-12 text-[#E75A3B] animate-pulse-slow" />
+      {!connectedAddress ? (
+        <div className="np-card p-8 sm:p-14 text-center flex flex-col items-center gap-6">
+          <div className="bg-volt border-2 border-ink shadow-[4px_4px_0_0_var(--ink)] w-14 h-14 flex items-center justify-center">
+            <Wallet className="w-6 h-6 text-acid" />
+          </div>
           <div>
-            <h3 className="text-xl font-black text-[#1C1B18]">Wallet Connection Required</h3>
-            <p className="text-xs text-[#6E6C64] mt-2 max-w-sm mx-auto leading-relaxed">
-              Connect your Stellar wallet (Freighter primary) to view your mock XLM balances, approve contract spends, and buy ticket tokens.
+            <h3 className="np-display text-lg">Wallet required</h3>
+            <p className="text-xs text-ink-soft mt-2 max-w-sm mx-auto leading-relaxed">
+              Connect Freighter (or any kit-supported wallet) to check your testnet
+              XLM balance, approve the contract spend, and mint entry coupons.
             </p>
           </div>
           <button
-            onClick={connectWallet}
-            className="bg-[#1C1B18] hover:bg-[#E75A3B] text-white text-xs font-bold px-8 py-3.5 rounded-xl transition-all shadow-sm flex items-center gap-2"
+            onClick={establishConnection}
+            className="np-btn np-btn-volt text-xs px-8 py-3.5 flex items-center gap-2"
           >
-            <Wallet className="w-4.5 h-4.5" />
-            Connect Freighter Wallet
+            <Wallet className="w-4 h-4" />
+            Connect Wallet
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
-          {/* Main Buy Box */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          {/* Main Action Interface */}
           <div className="md:col-span-2 flex flex-col gap-6">
-            
-            <div className="bg-white border border-[#EBE9E1] rounded-3xl p-6 sm:p-8 shadow-sm">
-              <div className="flex justify-between items-start border-b border-[#FAF9F5] pb-6 mb-6">
-                <div>
-                  <h3 className="text-lg font-black text-[#1C1B18]">Enter Active Round</h3>
-                  <p className="text-xs text-[#6E6C64] mt-1">
-                    Select ticket quantity and submit. Every ticket has an equal draw probability.
-                  </p>
-                </div>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-[#6E6C64] bg-[#FAF9F5] border border-[#EBE9E1] px-2.5 py-1 rounded-md">
-                  Round #{roundInfo.round_id || "1"}
+            <div className="np-card p-0 overflow-hidden">
+              <div className="bg-ink text-bone px-5 py-3 border-b-2 border-ink flex justify-between items-center">
+                <span className="np-mono text-[11px] font-bold uppercase tracking-[0.2em]">
+                  Acquire Entry Coupons
                 </span>
+                <Ticket className="w-4 h-4 text-acid" />
               </div>
 
-              {roundInfo.status === 0 && roundInfo.round_id > 0 ? (
-                <div className="py-8 text-center bg-[#FFF0EE] rounded-2xl border border-[#FFD2CC] p-6 text-[#D44E30]">
-                  <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
-                  <h4 className="text-sm font-bold">Round Voided</h4>
-                  <p className="text-xs mt-1">This round was closed with zero ticket purchases.</p>
-                </div>
-              ) : roundInfo.status === 2 ? (
-                <div className="py-8 text-center bg-[#ECF7F0] rounded-2xl border border-[#CDEBD8] p-6 text-[#378E56]">
-                  <CheckCircle2 className="w-8 h-8 mx-auto mb-2" />
-                  <h4 className="text-sm font-bold">Round Settled</h4>
-                  <p className="text-xs mt-1">The winner has been drawn and payouts distributed.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-6">
-                  {/* Quantity Selector */}
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#6E6C64] block mb-2">
-                      Quantity of Tickets
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setTicketQty(Math.max(1, ticketQty - 1))}
-                        className="w-10 h-10 border border-[#EBE9E1] hover:bg-[#FAF9F5] rounded-xl flex items-center justify-center font-bold text-sm text-[#1C1B18] transition-all"
-                      >
-                        -
-                      </button>
-                      <div className="w-16 h-10 border border-[#EBE9E1] bg-[#FAF9F5] rounded-xl flex items-center justify-center font-extrabold text-sm text-[#1C1B18]">
-                        {ticketQty}
-                      </div>
-                      <button
-                        onClick={() => setTicketQty(Math.min(5, ticketQty + 1))}
-                        className="w-10 h-10 border border-[#EBE9E1] hover:bg-[#FAF9F5] rounded-xl flex items-center justify-center font-bold text-sm text-[#1C1B18] transition-all"
-                      >
-                        +
-                      </button>
-                      <span className="text-[10px] text-[#6E6C64] ml-2">
-                        Max 5 per txn (prevents sequence clashes)
-                      </span>
-                    </div>
+              <div className="p-5 sm:p-7">
+                {cycleDetails.status === 0 && cycleDetails.round_id > 0 ? (
+                  <div className="np-stripes border-2 border-ink p-8 text-center">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-3" />
+                    <h4 className="np-display text-sm">Cycle voided</h4>
+                    <p className="text-xs text-ink-soft mt-2">
+                      This cycle closed with zero entry coupons. Waiting for the administrator to open the next one.
+                    </p>
                   </div>
-
-                  {/* Summary cost */}
-                  <div className="bg-[#FAF9F5] border border-[#EBE9E1] rounded-2xl p-4 flex justify-between items-center text-xs">
+                ) : cycleDetails.status === 2 ? (
+                  <div className="border-2 border-mint bg-paper p-8 text-center shadow-[4px_4px_0_0_var(--mint)]">
+                    <CheckCircle2 className="w-8 h-8 mx-auto mb-3 text-mint" />
+                    <h4 className="np-display text-sm">Cycle resolved</h4>
+                    <p className="text-xs text-ink-soft mt-2">
+                      The draw concluded and payouts were dispersed atomically. Check the winner on the Winners page.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-6">
+                    {/* Quantity Selector */}
                     <div>
-                      <span className="text-[#6E6C64] block mb-0.5">Total Ticket Cost</span>
-                      <span className="font-bold text-[#1C1B18]">
-                        {ticketQty} &times; {fromStroops(pricePerTicket)} XLM
-                      </span>
+                      <label className="np-label block mb-2">Coupon Quantity</label>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setCouponQty(Math.max(1, couponQty - 1))}
+                          className="np-btn np-btn-ghost w-11 h-11 flex items-center justify-center"
+                          aria-label="Decrease quantity"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <div className="np-mono font-tabular w-16 h-11 border-2 border-ink bg-acid flex items-center justify-center font-bold text-lg">
+                          {couponQty}
+                        </div>
+                        <button
+                          onClick={() => setCouponQty(Math.min(5, couponQty + 1))}
+                          className="np-btn np-btn-ghost w-11 h-11 flex items-center justify-center"
+                          aria-label="Increase quantity"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                        <span className="np-mono text-[10px] uppercase text-ink-soft ml-1">
+                          Max 5 / batch
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[#6E6C64] block mb-0.5">Stroops</span>
-                      <span className="font-bold text-[#E75A3B]">{totalCostStroops.toString()}</span>
-                    </div>
-                  </div>
 
-                  {/* Buy Button */}
-                  {roundInfo.status === 1 && !isExpired && (
-                    <button
-                      onClick={handleBuyTickets}
-                      disabled={loading}
-                      className="w-full bg-[#1C1B18] hover:bg-[#E75A3B] text-white font-bold py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Ticket className="w-4.5 h-4.5" />
-                      {loading ? "Processing..." : `Mint Tickets (${fromStroops(totalCostStroops)} XLM)`}
-                    </button>
-                  )}
-
-                  {/* Settle Action */}
-                  {roundInfo.status === 1 && isExpired && (
-                    <div className="bg-[#FFF8EE] border border-[#FEEBD0] p-6 rounded-2xl flex flex-col gap-4">
-                      <div className="flex gap-2">
-                        <Clock className="w-5 h-5 mt-0.5 text-[#E75A3B] flex-shrink-0" />
-                        <div>
-                          <h4 className="text-xs font-bold text-[#1C1B18] uppercase tracking-wider">Round Finished!</h4>
-                          <p className="text-[11px] text-[#6E6C64] mt-0.5">
-                            The countdown timer has expired. Users can no longer purchase tickets. Click Settle to draw.
-                          </p>
+                    {/* Summary cost */}
+                    <div className="border-2 border-ink bg-bone p-4 flex justify-between items-center">
+                      <div>
+                        <div className="np-label mb-1">Total Cost</div>
+                        <div className="np-mono font-bold text-sm">
+                          {couponQty} × {convertStroopsToXlm(pricePerCoupon)} XLM
                         </div>
                       </div>
-                      <button
-                        onClick={handleSettle}
-                        disabled={loading}
-                        className="w-full bg-[#E75A3B] hover:bg-[#D44E30] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm text-xs flex items-center justify-center gap-2"
-                      >
-                        <Coins className="w-4.5 h-4.5" />
-                        {loading ? "Settling..." : "Settle Round & Draw Winner"}
-                      </button>
+                      <div className="text-right">
+                        <div className="np-label mb-1">Stroops</div>
+                        <div className="np-mono font-tabular font-bold text-sm text-volt">
+                          {totalCostStroops.toString()}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
 
+                    {/* Buy Button */}
+                    {cycleDetails.status === 1 && !isExpired && (
+                      <button
+                        onClick={handleBuyCoupons}
+                        disabled={isProcessing}
+                        className="np-btn np-btn-volt w-full py-4 text-xs flex items-center justify-center gap-2"
+                      >
+                        <Ticket className="w-4 h-4" />
+                        {isProcessing ? "Processing ledger…" : `Acquire coupons (${convertStroopsToXlm(totalCostStroops)} XLM)`}
+                      </button>
+                    )}
+
+                    {/* Settle Action */}
+                    {cycleDetails.status === 1 && isExpired && (
+                      <div className="border-2 border-ink bg-acid np-stripes p-5 flex flex-col gap-4">
+                        <div className="flex gap-2.5">
+                          <Clock className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <h4 className="np-display text-xs">Cycle expired — draw ready</h4>
+                            <p className="text-[11px] mt-1 leading-relaxed">
+                              The countdown hit zero, so coupon minting is closed. Anyone may
+                              trigger the draw: the contract picks the winner and disperses funds.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleSettle}
+                          disabled={isProcessing}
+                          className="np-btn np-btn-ink w-full py-3.5 text-xs flex items-center justify-center gap-2"
+                        >
+                          <Coins className="w-4 h-4" />
+                          {isProcessing ? "Resolving winner…" : "Settle cycle & draw winner"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Right Status column */}
+          {/* Right Info Column */}
           <div className="flex flex-col gap-6">
-            
-            {/* Round info card */}
-            <div className="bg-white border border-[#EBE9E1] rounded-3xl p-6 shadow-sm flex flex-col gap-4">
-              <h3 className="text-xs font-black uppercase tracking-wider text-[#1C1B18] border-b border-[#FAF9F5] pb-2">
-                Pool Status
-              </h3>
-              
+            {/* Pool Status Card */}
+            <div className="np-card-flat p-5 flex flex-col gap-3.5">
+              <h3 className="np-label border-b-2 border-ink pb-2">Pool Status</h3>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#6E6C64]">Active Pot</span>
-                <span className="font-extrabold text-[#E75A3B]">{fromStroops(BigInt(roundInfo.pot))} XLM</span>
+                <span className="text-ink-soft">Jackpot</span>
+                <span className="np-mono font-tabular font-bold text-volt">
+                  {convertStroopsToXlm(BigInt(cycleDetails.pot))} XLM
+                </span>
               </div>
-              
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#6E6C64]">Tickets sold</span>
-                <span className="font-extrabold text-[#1C1B18]">{roundInfo.ticket_count} sold</span>
+                <span className="text-ink-soft">Coupons issued</span>
+                <span className="np-mono font-tabular font-bold">{cycleDetails.ticket_count}</span>
               </div>
-
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#6E6C64]">Closes in</span>
-                <span className="font-extrabold text-[#1C1B18] flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-[#E75A3B]" />
+                <span className="text-ink-soft">Time remaining</span>
+                <span className="np-mono font-tabular font-bold flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-volt" />
                   {timeLeft || "Closed"}
                 </span>
               </div>
             </div>
 
-            {/* User status card */}
-            <div className="bg-white border border-[#EBE9E1] rounded-3xl p-6 shadow-sm flex flex-col gap-4">
-              <h3 className="text-xs font-black uppercase tracking-wider text-[#1C1B18] border-b border-[#FAF9F5] pb-2">
-                Your Round Stats
-              </h3>
-              
+            {/* User Stats Card */}
+            <div className="np-card-flat p-5 flex flex-col gap-3.5">
+              <h3 className="np-label border-b-2 border-ink pb-2">Your Position</h3>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#6E6C64]">Your Tickets</span>
-                <span className="font-extrabold text-[#E75A3B] flex items-center gap-1">
-                  <Ticket className="w-3.5 h-3.5" />
-                  {userTickets} tickets
+                <span className="text-ink-soft">Your coupons</span>
+                <span className="np-mono font-tabular font-bold flex items-center gap-1">
+                  <Ticket className="w-3.5 h-3.5 text-volt" />
+                  {userAllocatedCoupons}
                 </span>
               </div>
-              
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#6E6C64]">Win Probability</span>
-                <span className="font-extrabold text-[#1C1B18]">
-                  {roundInfo.ticket_count > 0 ? ((userTickets / roundInfo.ticket_count) * 100).toFixed(0) : "0"}%
+                <span className="text-ink-soft">Win probability</span>
+                <span className="np-mono font-tabular font-bold">
+                  {cycleDetails.ticket_count > 0 ? ((userAllocatedCoupons / cycleDetails.ticket_count) * 100).toFixed(0) : "0"}%
                 </span>
               </div>
-
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[#6E6C64]">Wallet balance</span>
-                <span className="font-extrabold text-[#1C1B18]">{parseFloat(balance).toFixed(2)} XLM</span>
+                <span className="text-ink-soft">XLM balance</span>
+                <span className="np-mono font-tabular font-bold">{parseFloat(xlmBalance).toFixed(2)}</span>
               </div>
             </div>
 
-            {/* Admin Panel card */}
-            {pubKey && adminAddress && pubKey === adminAddress && (
-              <div className="bg-white border border-coral/30 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
-                <h3 className="text-xs font-black uppercase tracking-wider text-coral border-b border-coral/10 pb-2 flex items-center gap-1.5">
+            {/* Admin Panel Card */}
+            {connectedAddress && administratorAddress && connectedAddress === administratorAddress && (
+              <div className="np-card p-0 overflow-hidden">
+                <div className="bg-volt text-paper px-4 py-2.5 border-b-2 border-ink flex items-center gap-1.5">
                   <Settings className="w-3.5 h-3.5" />
-                  Admin Panel
-                </h3>
-                
-                <div className="flex flex-col gap-3">
+                  <span className="np-mono text-[10px] font-bold uppercase tracking-widest">
+                    Administrator
+                  </span>
+                </div>
+                <div className="p-4 flex flex-col gap-3">
                   <div>
-                    <label className="text-[9px] uppercase font-bold text-[#6E6C64] block mb-1">
-                      Round Duration (seconds)
-                    </label>
+                    <label className="np-label block mb-1.5">Cycle duration (seconds)</label>
                     <input
                       type="number"
                       value={openDuration}
                       onChange={(e) => setOpenDuration(Math.max(10, parseInt(e.target.value) || 10))}
-                      className="w-full bg-[#FAF9F5] border border-[#EBE9E1] px-3 py-2 rounded-xl text-xs font-bold text-[#1C1B18] focus:outline-none focus:border-coral"
+                      className="np-input w-full text-xs"
                     />
                   </div>
-
                   <button
                     onClick={handleOpenRound}
-                    disabled={loading || (roundInfo.status === 1 && !isExpired)}
-                    className="w-full bg-coral hover:bg-coral-hover disabled:bg-sand text-white font-bold py-2.5 rounded-xl transition-all shadow-sm text-xs flex items-center justify-center gap-1"
+                    disabled={isProcessing || (cycleDetails.status === 1 && !isExpired)}
+                    className="np-btn np-btn-ink w-full py-2.5 text-[11px]"
                   >
-                    Open New Round
+                    Open New Cycle
                   </button>
                 </div>
               </div>
             )}
-
           </div>
-
         </div>
       )}
-
     </div>
   );
 }

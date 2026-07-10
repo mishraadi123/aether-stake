@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint src",
-    "test": "node --test src/utils/format.test.mjs"
+    "test": "node --test src/core/stellar/formatter.test.mjs"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.5.0",

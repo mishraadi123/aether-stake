@@ -1,19 +1,19 @@
 import "./globals.css";
-import { WalletProvider } from "../context/WalletContext";
-import SharedLayout from "../components/SharedLayout";
+import { AetherWalletProvider } from "../modules/wallet/WalletProvider";
+import AppLayout from "../modules/layout/AppLayout";
 
 export const metadata = {
-  title: "Windfall | Stellar Soroban prize pool dApp",
-  description: "Buy tickets into a shared prize pool during a timed round. One ticket is selected via on-chain pseudo-randomness, paying out the jackpot to the winner.",
+  title: "Aether Sweepstakes | Stellar Soroban yield pool dApp",
+  description: "Acquire entries into a shared premium sweepstakes yield pool. The contract draws the winner on-chain via pseudo-randomness, distributing accumulated yields.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="antialiased min-h-screen flex flex-col bg-cream text-charcoal">
-        <WalletProvider>
-          <SharedLayout>{children}</SharedLayout>
-        </WalletProvider>
+      <body className="antialiased min-h-screen flex flex-col bg-bone text-ink">
+        <AetherWalletProvider>
+          <AppLayout>{children}</AppLayout>
+        </AetherWalletProvider>
       </body>
     </html>
   );

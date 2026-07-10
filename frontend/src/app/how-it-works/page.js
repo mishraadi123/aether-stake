@@ -1,47 +1,66 @@
 "use client";
 
-import { Info, ShieldAlert, Award, FileCode, CheckCircle2, Layers } from "lucide-react";
+import Link from "next/link";
+import { ShieldAlert, CheckCircle2, Layers, ArrowRight, ArrowDown } from "lucide-react";
+
+function FlowNode({ children, dark = false }) {
+  return (
+    <div className={`border-2 border-ink px-4 py-2.5 text-center np-mono text-[11px] font-bold w-full sm:w-auto ${dark ? "bg-ink text-bone" : "bg-paper"}`}>
+      {children}
+    </div>
+  );
+}
+
+function FlowArrow({ label }) {
+  return (
+    <div className="flex sm:flex-col items-center gap-1 text-volt">
+      <ArrowRight className="w-4 h-4 hidden sm:block" />
+      <ArrowDown className="w-4 h-4 sm:hidden" />
+      <span className="np-mono text-[9px] font-bold uppercase">{label}</span>
+    </div>
+  );
+}
 
 export default function HowItWorks() {
   return (
-    <div className="max-w-4xl mx-auto w-full py-6 flex flex-col gap-8 animate-fade-in">
-      
+    <div className="max-w-4xl mx-auto w-full flex flex-col gap-6 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-black text-[#1C1B18]">System Mechanics & Architecture</h2>
-        <p className="text-xs text-[#6E6C64] mt-1">
-          Detailed explanation of contract logic, random drawing constraints, and inter-contract execution flows.
+        <h1 className="np-display text-2xl sm:text-3xl">Protocol specs</h1>
+        <p className="np-mono text-[11px] uppercase tracking-wider text-ink-soft mt-1.5">
+          Contract logic · draw parameters · cross-contract topology
         </p>
       </div>
 
-      {/* Mechanics Explanation */}
+      {/* Mechanics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white border border-[#EBE9E1] p-6 rounded-3xl shadow-sm flex flex-col gap-3">
-          <h3 className="text-sm font-black uppercase tracking-wider text-[#1C1B18] flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[#378E56]" />
+        <div className="np-card-flat p-5 flex flex-col gap-3">
+          <h3 className="np-label flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-mint" />
             Core Mechanics
           </h3>
-          <ul className="text-xs text-[#6E6C64] list-disc pl-4 flex flex-col gap-2">
-            <li>
-              <strong>Timed Rounds:</strong> Active rounds are opened with a duration parameter. Tickets can only be bought while the round timer is ticking down.
+          <ul className="text-xs text-ink-soft flex flex-col gap-3 leading-relaxed">
+            <li className="border-l-4 border-volt pl-3">
+              <strong className="text-ink">Timed cycles.</strong> Each cycle opens with a fixed
+              duration; coupons can only be minted while the on-chain clock runs.
             </li>
-            <li>
-              <strong>Ticket Mints:</strong> Buying a ticket pulls 1 XLM and mints a unique Ticket Token to track round ownership.
+            <li className="border-l-4 border-volt pl-3">
+              <strong className="text-ink">Coupon mints.</strong> Every entry pulls 1 XLM into the
+              pool and mints a coupon token recording your participation.
             </li>
-            <li>
-              <strong>Fees:</strong> When settled, 5% of the round pot is transferred to the treasury, and 95% goes to the winner.
+            <li className="border-l-4 border-volt pl-3">
+              <strong className="text-ink">95 / 5 split.</strong> Settlement pays 95% of the pot to
+              the drawn winner and routes 5% into the commission vault.
             </li>
           </ul>
         </div>
 
-        <div className="bg-white border border-[#EBE9E1] p-6 rounded-3xl shadow-sm flex flex-col gap-3">
-          <h3 className="text-sm font-black uppercase tracking-wider text-[#1C1B18] flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-[#E75A3B]" />
-            Pseudo-Randomness Draw
+        <div className="np-card-flat p-5 flex flex-col gap-3">
+          <h3 className="np-label flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-alarm" />
+            Pseudo-Random Draw
           </h3>
-          <p className="text-xs text-[#6E6C64] leading-relaxed">
-            The winning index is resolved using ledger-derived parameters:
-          </p>
-          <pre className="bg-[#FAF9F5] border border-[#EBE9E1] p-3.5 rounded-xl text-[10px] font-mono text-[#1C1B18] leading-tight">
+          <div className="overflow-x-auto border-2 border-ink bg-ink">
+            <pre className="np-mono text-[10px] leading-relaxed p-3.5 text-acid whitespace-pre min-w-max">
 {`let mut data = Bytes::new(&env);
 data.extend_from_array(&timestamp);
 data.extend_from_array(&sequence);
@@ -51,71 +70,65 @@ data.extend_from_array(&ticket_count);
 let hash = env.crypto().sha256(&data);
 let seed = first_8_bytes_as_u64(hash);
 let winner_idx = seed % ticket_count;`}
-          </pre>
-          <p className="text-[10px] text-[#6E6C64] leading-relaxed italic">
-            <strong>Limitation:</strong> In public blockchains, validators or miners could theoretically simulate the transaction before committing it, allowing manipulation if they hold enough hashing power. It is ideal for testnet/demonstrations but should be replaced by a secure decentralized oracle (e.g. Pyth/VRF) on mainnet.
+            </pre>
+          </div>
+          <p className="text-[11px] text-ink-soft leading-relaxed">
+            Ledger-header entropy is transparent and operator-free, but validators
+            could theoretically pre-simulate outcomes. Full analysis on the{" "}
+            <Link href="/fairness" className="text-volt font-bold hover:underline">Fairness page</Link>.
           </p>
         </div>
       </div>
 
-      {/* Architecture Diagram */}
-      <div className="bg-white border border-[#EBE9E1] rounded-3xl p-6 sm:p-8 shadow-sm">
-        <h3 className="text-sm font-black uppercase tracking-wider text-[#1C1B18] mb-6 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-[#E75A3B]" />
-          3-Contract Inter-Contract Call Paths
-        </h3>
+      {/* Inter-contract topology */}
+      <div className="np-card p-0 overflow-hidden">
+        <div className="bg-ink text-bone px-5 py-3 border-b-2 border-ink flex items-center gap-2">
+          <Layers className="w-4 h-4 text-acid" />
+          <span className="np-mono text-[11px] font-bold uppercase tracking-[0.2em]">
+            Inter-Contract Call Topology
+          </span>
+        </div>
 
-        {/* ASCII / Graphical Diagram */}
-        <div className="bg-[#FAF9F5] border border-[#EBE9E1] p-6 rounded-2xl flex flex-col gap-8 text-xs font-mono text-[#1C1B18] leading-relaxed">
+        <div className="p-5 sm:p-7 flex flex-col gap-8">
           <div>
-            <h4 className="text-[10px] uppercase font-bold text-[#6E6C64] mb-3">
-              Flow 1: buy_ticket() execution path
-            </h4>
+            <h4 className="np-label mb-4">Flow 1 — purchase_entry_ticket()</h4>
             <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="bg-white border border-[#EBE9E1] p-3 rounded-lg w-full sm:w-auto text-center font-bold">
-                User
-              </div>
-              <div className="text-center">&rarr; [buy_ticket] &rarr;</div>
-              <div className="bg-[#1C1B18] text-white p-3 rounded-lg w-full sm:w-auto text-center font-bold">
-                Lottery Contract
-              </div>
-              <div className="text-center">&rarr; [mint] &rarr;</div>
-              <div className="bg-white border border-[#EBE9E1] p-3 rounded-lg w-full sm:w-auto text-center font-bold">
-                Ticket Token Contract
-              </div>
+              <FlowNode>Participant</FlowNode>
+              <FlowArrow label="purchase_entry_ticket" />
+              <FlowNode dark>Aether Pool</FlowNode>
+              <FlowArrow label="issue_entry_coupon" />
+              <FlowNode>Sweep Coupon</FlowNode>
             </div>
-            <p className="text-[10px] text-[#6E6C64] mt-2">
-              Coordinator contract verifies logic, pulls XLM via <code>transfer_from</code>, and calls <code>mint</code> on the Ticket contract.
+            <p className="text-[11px] text-ink-soft mt-3 leading-relaxed">
+              The pool verifies cycle rules, pulls the XLM stake via the native
+              asset contract, then makes a cross-contract call with{" "}
+              <code className="np-mono text-volt">env.invoke_contract</code> to mint the entry
+              coupon on the Sweep Coupon contract — one atomic transaction.
             </p>
           </div>
 
-          <div className="border-t border-[#EBE9E1] pt-6">
-            <h4 className="text-[10px] uppercase font-bold text-[#6E6C64] mb-3">
-              Flow 2: settle_round() execution path
-            </h4>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <div className="bg-[#1C1B18] text-white p-3 rounded-lg w-full sm:w-auto text-center font-bold">
-                  Lottery Contract
-                </div>
-                <div className="text-center">&rarr; [draw & transfers] &rarr;</div>
-                <div className="flex flex-col gap-2 w-full sm:w-auto">
-                  <div className="bg-white border border-[#EBE9E1] p-2.5 rounded-lg text-center font-bold">
-                    Winner (95% XLM Payout)
-                  </div>
-                  <div className="bg-white border border-[#EBE9E1] p-2.5 rounded-lg text-center font-bold">
-                    Treasury (5% XLM Fee Vault)
-                  </div>
-                </div>
+          <div className="border-t-2 border-ink pt-7">
+            <h4 className="np-label mb-4">Flow 2 — resolve_and_draw()</h4>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <FlowNode dark>Aether Pool</FlowNode>
+              <FlowArrow label="resolve_coupon_holder" />
+              <FlowNode>Sweep Coupon</FlowNode>
+              <FlowArrow label="transfer + record_commission" />
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <FlowNode>Winner · 95%</FlowNode>
+                <FlowNode>Vault · 5%</FlowNode>
               </div>
             </div>
-            <p className="text-[10px] text-[#6E6C64] mt-2">
-              Coordinator hashes entropy, maps index to token owner via Ticket contract&apos;s <code>get_owner</code>, and sends transfers to both winner and treasury.
+            <p className="text-[11px] text-ink-soft mt-3 leading-relaxed">
+              Settlement derives the winning index from ledger entropy, resolves it
+              to an address via <code className="np-mono text-volt">resolve_coupon_holder</code>,
+              pays the winner, then transfers the commission and invokes{" "}
+              <code className="np-mono text-volt">record_commission</code> on the vault — all
+              inside a single atomic invocation. If any step fails, everything reverts.
             </p>
           </div>
         </div>
       </div>
-
     </div>
   );
 }

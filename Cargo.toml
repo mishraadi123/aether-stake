@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-  "contracts/lottery",
-  "contracts/ticket",
-  "contracts/treasury",
+  "contracts/aether_pool",
+  "contracts/sweep_coupon",
+  "contracts/commission_vault",
 ]
 
 [workspace.dependencies]

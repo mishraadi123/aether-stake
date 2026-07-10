@@ -1,0 +1,17 @@
+[package]
+name = "aether_pool"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+sweep_coupon = { path = "../sweep_coupon" }
+commission_vault = { path = "../commission_vault" }

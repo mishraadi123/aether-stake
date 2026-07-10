@@ -1,4 +1,4 @@
-name: Windfall CI
+name: Aether Sweepstakes CI
 
 on:
   push:

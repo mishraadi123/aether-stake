@@ -1,103 +1,119 @@
 "use client";
 
-import { useWallet } from "../../context/WalletContext";
-import { fromStroops } from "../../utils/stellar";
-import { Trophy, ExternalLink, Award, ShieldCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAetherWallet } from "../../modules/wallet/WalletProvider";
+import { queryCycleDetails, convertStroopsToXlm } from "../../core/stellar/client";
+import { Trophy, ExternalLink, Loader2 } from "lucide-react";
+import Link from "next/link";
 
 export default function Winners() {
-  const { roundInfo } = useWallet();
+  const { activeCycleSequence } = useAetherWallet();
+  const [resolved, setResolved] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const mockWinners = [
-    {
-      round_id: 1,
-      winner: "GAKF7GXDBJS2MMMVFHE4UNEKXJM3BABM3DQCSTF3JKRKN5WZI4GW4TIV",
-      amount: 4750000000n, // 475 XLM (payout = 500 pot - 25 fee)
-      pot: 5000000000n,
-      tx: "f7e84e817952f2be2f9b4a3984311831e8eb09e6a7b3b365f9282df743eb55f7",
-      timestamp: "2026-07-08T06:55:40Z"
+  // Real winners only: query every cycle from the contract and keep the ones
+  // that settled with a drawn winner (status 2).
+  useEffect(() => {
+    if (!activeCycleSequence) {
+      setLoading(activeCycleSequence === 0 ? false : true);
+      if (activeCycleSequence === 0) setResolved([]);
+      return;
     }
-  ];
+    let cancelled = false;
+    (async () => {
+      try {
+        const ids = Array.from({ length: activeCycleSequence }, (_, i) => i + 1);
+        const details = await Promise.all(ids.map((id) => queryCycleDetails(id).catch(() => null)));
+        if (!cancelled) {
+          setResolved(
+            details.filter((c) => c && c.status === 2 && c.winner).reverse()
+          );
+        }
+      } catch (err) {
+        console.warn("winner history fetch failed", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCycleSequence]);
 
   return (
-    <div className="max-w-4xl mx-auto w-full py-6 flex flex-col gap-8 animate-fade-in">
-      
+    <div className="max-w-3xl mx-auto w-full flex flex-col gap-6 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-black text-[#1C1B18]">Winners Feed</h2>
-        <p className="text-xs text-[#6E6C64] mt-1">
-          Verifiable ledger transactions showing payout distributions to round winners.
+        <h1 className="np-display text-2xl sm:text-3xl">Winners</h1>
+        <p className="np-mono text-[11px] uppercase tracking-wider text-ink-soft mt-1.5">
+          Drawn on-chain · paid atomically · verifiable forever
         </p>
       </div>
 
-      <div className="flex flex-col gap-6">
-        {/* Active winner from context if settled */}
-        {roundInfo.status === 2 && roundInfo.winner && (
-          <div className="bg-[#ECF7F0] border-2 border-[#CDEBD8] rounded-3xl p-6 relative overflow-hidden shadow-sm">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-[#378E56]/5 rounded-full blur-2xl"></div>
-            <div className="flex items-start gap-4">
-              <div className="bg-[#378E56] text-white p-3 rounded-2xl flex items-center justify-center">
-                <Trophy className="w-6 h-6" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-[9px] uppercase font-bold tracking-widest text-[#378E56] bg-white border border-[#CDEBD8] px-2 py-0.5 rounded-md mb-2 inline-block">
-                  Live Draw Winner
-                </span>
-                <h3 className="text-lg font-black text-[#1C1B18] mt-1">
-                  Round #{roundInfo.round_id} Winner selected
-                </h3>
-                <div className="mt-3 flex flex-col gap-1.5 text-xs text-[#6E6C64]">
-                  <div>
-                    Winner Account: <span className="font-mono text-[#1C1B18] font-bold select-all break-all">{roundInfo.winner}</span>
+      {loading ? (
+        <div className="np-card p-10 text-center">
+          <Loader2 className="w-6 h-6 mx-auto mb-3 animate-spin text-volt" />
+          <p className="np-mono text-[11px] uppercase tracking-wider text-ink-soft">
+            Reading resolved cycles from the pool contract…
+          </p>
+        </div>
+      ) : resolved.length === 0 ? (
+        <div className="np-card p-10 text-center">
+          <Trophy className="w-7 h-7 mx-auto mb-3 text-volt" />
+          <p className="np-display text-sm mb-2">No winners drawn yet</p>
+          <p className="text-xs text-ink-soft max-w-sm mx-auto">
+            The current deployment hasn&apos;t resolved a cycle with entries yet.
+            The first winner will appear here the moment a draw settles —{" "}
+            <Link href="/play" className="text-volt font-bold hover:underline">enter the live cycle</Link>{" "}
+            to make it happen.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {resolved.map((cycle) => {
+            const payout = (BigInt(cycle.pot) * 95n) / 100n;
+            return (
+              <div key={cycle.round_id} className="np-card p-0 overflow-hidden">
+                <div className="bg-volt text-paper px-5 py-3 border-b-2 border-ink flex items-center justify-between">
+                  <span className="np-mono text-[11px] font-bold uppercase tracking-[0.2em] flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-acid" />
+                    Cycle #{cycle.round_id}
+                  </span>
+                  <span className="np-chip np-chip-acid">Resolved</span>
+                </div>
+                <div className="p-5 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+                  <div className="min-w-0">
+                    <div className="np-label mb-1">Winning Account</div>
+                    <a
+                      href={`https://stellar.expert/explorer/testnet/account/${cycle.winner}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="np-mono text-xs font-bold break-all hover:text-volt transition-colors inline-flex items-center gap-1"
+                    >
+                      {cycle.winner}
+                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                    </a>
+                    <div className="np-mono text-[10px] text-ink-soft mt-2">
+                      {cycle.ticket_count} entries · closed{" "}
+                      {cycle.close_time ? new Date(cycle.close_time * 1000).toLocaleString() : "—"}
+                    </div>
                   </div>
-                  <div>
-                    Prize Payout: <span className="font-extrabold text-[#378E56]">{fromStroops(BigInt(roundInfo.pot) * 95n / 100n)} XLM</span> (95% jackpot)
+                  <div className="border-2 border-ink bg-acid px-4 py-3 text-center flex-shrink-0">
+                    <div className="np-label mb-0.5">Payout (95%)</div>
+                    <div className="np-mono font-tabular text-xl font-bold">
+                      {convertStroopsToXlm(payout)} XLM
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            );
+          })}
+        </div>
+      )}
 
-        {mockWinners.map((winner, idx) => (
-          <div key={idx} className="bg-white border border-[#E6E3D8] rounded-2xl p-6 shadow-sm relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            {/* Ticket side indents */}
-            <div className="absolute top-1/2 -left-3.5 w-7 h-7 bg-cream border-r border-[#E6E3D8] rounded-full -translate-y-1/2"></div>
-            <div className="absolute top-1/2 -right-3.5 w-7 h-7 bg-cream border-l border-[#E6E3D8] rounded-full -translate-y-1/2"></div>
-            <div className="flex items-center gap-4">
-              <div className="bg-[#FAF9F5] border border-[#EBE9E1] text-[#E75A3B] p-3 rounded-2xl">
-                <Award className="w-5.5 h-5.5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-[#1C1B18]">
-                  Round #{winner.round_id} Jackpot Payout
-                </h4>
-                <p className="text-[10px] text-[#6E6C64] mt-0.5">
-                  Winner: <span className="font-mono text-[#1C1B18] font-bold">{winner.winner.slice(0, 12)}...{winner.winner.slice(-6)}</span>
-                </p>
-                <p className="text-[9px] text-[#6E6C64] mt-1">
-                  Settled at: {new Date(winner.timestamp).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            <div className="sm:text-right w-full sm:w-auto border-t sm:border-t-0 border-[#FAF9F5] pt-4 sm:pt-0 flex sm:flex-col justify-between sm:justify-start items-center sm:items-end gap-2">
-              <div>
-                <span className="text-[9px] uppercase tracking-wider text-[#6E6C64] block">Prize Reward</span>
-                <span className="text-lg font-black text-[#E75A3B]">{fromStroops(winner.amount)} XLM</span>
-              </div>
-              <a
-                href={`https://stellar.expert/explorer/testnet/tx/${winner.tx}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] font-bold text-[#E75A3B] hover:underline inline-flex items-center gap-1 bg-[#FAF9F5] px-2.5 py-1 rounded-lg border border-[#EBE9E1] hover:bg-white"
-              >
-                Verify Tx
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </div>
-        ))}
-      </div>
-
+      <p className="np-mono text-[10px] uppercase tracking-wider text-ink-soft text-center">
+        Winner data is read live from contract storage — the draw transactions
+        themselves are linked in the <Link href="/activity" className="text-volt hover:underline">live feed</Link>.
+      </p>
     </div>
   );
 }

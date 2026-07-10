@@ -1,6 +1,7 @@
 "use client";
 
-import { Mail, HelpCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink, ShieldCheck } from "lucide-react";
+import { AETHER_POOL_ID } from "../../core/stellar/client";
 
 const GithubIcon = (props) => (
   <svg
@@ -20,85 +21,69 @@ const GithubIcon = (props) => (
 
 export default function Contact() {
   return (
-    <div className="max-w-4xl mx-auto w-full py-6 flex flex-col gap-8 animate-fade-in">
-      
+    <div className="max-w-3xl mx-auto w-full flex flex-col gap-6 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-black text-[#1C1B18]">Support & Contact Channels</h2>
-        <p className="text-xs text-[#6E6C64] mt-1">
-          Get in touch with the maintainers or report issues.
+        <h1 className="np-display text-2xl sm:text-3xl">Contact</h1>
+        <p className="np-mono text-[11px] uppercase tracking-wider text-ink-soft mt-1.5">
+          Maintainer channels · no forms, on purpose
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        
-        {/* Info card */}
-        <div className="bg-white border border-[#EBE9E1] rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col gap-5">
-          <h3 className="text-sm font-black uppercase tracking-wider text-[#1C1B18] border-b border-[#FAF9F5] pb-2">
-            No Backend Form Disclaimer
-          </h3>
-          <p className="text-xs text-[#6E6C64] leading-relaxed">
-            Because this application compiles to a static HTML build (<code>output: &apos;export&apos;</code>) hosted directly on Cloudflare Workers edge nodes, **there is no backing Node.js backend server** to process contact forms.
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Static notice */}
+        <div className="np-card-flat p-6 flex flex-col gap-4">
+          <h3 className="np-label border-b-2 border-ink pb-2">Why No Contact Form</h3>
+          <p className="text-xs text-ink-soft leading-relaxed">
+            This app compiles to pure static assets (<code className="np-mono text-volt">output: &apos;export&apos;</code>)
+            served from the edge — there is no backend to receive form submissions.
           </p>
-          <div className="bg-[#FFF8EE] border border-[#FEEBD0] text-[#E75A3B] p-4 rounded-xl flex items-start gap-3">
+          <div className="border-2 border-ink np-stripes bg-bone p-4 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-            <p className="text-[10px] text-[#6E6C64] leading-relaxed">
-              We explicitly choose not to include a dummy contact form to ensure full transparent design compliance with challenge submission guidelines.
+            <p className="text-[11px] leading-relaxed">
+              Rather than ship a dummy form that silently drops your message, we
+              list only channels that actually reach the maintainer.
             </p>
           </div>
         </div>
 
-        {/* Contact channels card */}
-        <div className="bg-white border border-[#EBE9E1] rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col gap-4">
-          <h3 className="text-sm font-black uppercase tracking-wider text-[#1C1B18] border-b border-[#FAF9F5] pb-2">
-            Communication Channels
-          </h3>
-          
-          <div className="flex flex-col gap-3.5 mt-2">
-            {/* Github Issues */}
+        {/* Channels */}
+        <div className="np-card-flat p-6 flex flex-col gap-4">
+          <h3 className="np-label border-b-2 border-ink pb-2">Channels</h3>
+          <div className="flex flex-col gap-3">
             <a
-              href="https://github.com/shaurya-garg/windfall/issues"
+              href="https://github.com/shaurya-garg-82"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between p-4 bg-[#FAF9F5] border border-[#EBE9E1] hover:border-[#1C1B18] rounded-2xl transition-all group"
+              className="np-btn np-btn-ghost p-4 flex items-center justify-between normal-case tracking-normal font-normal text-left"
             >
               <div className="flex items-center gap-3">
-                <GithubIcon className="w-5 h-5 text-[#E75A3B]" />
+                <GithubIcon className="w-5 h-5 text-volt" />
                 <div className="text-xs">
-                  <span className="font-bold text-[#1C1B18] block">GitHub Issues</span>
-                  <span className="text-[#6E6C64]">Report bugs and request features</span>
+                  <span className="np-mono font-bold uppercase block">GitHub</span>
+                  <span className="text-ink-soft">@shaurya-garg-82 — issues &amp; PRs</span>
                 </div>
               </div>
-              <ExternalLink className="w-4 h-4 text-[#6E6C64] group-hover:text-[#1C1B18] transition-colors" />
+              <ExternalLink className="w-4 h-4 flex-shrink-0" />
             </a>
 
-            {/* Email mailto composer */}
             <a
-              href="mailto:shaurya@example.com?subject=Windfall%20Stellar%20dApp%20Feedback"
-              className="flex items-center justify-between p-4 bg-[#FAF9F5] border border-[#EBE9E1] hover:border-[#1C1B18] rounded-2xl transition-all group"
+              href={`https://stellar.expert/explorer/testnet/contract/${AETHER_POOL_ID}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="np-btn np-btn-ghost p-4 flex items-center justify-between normal-case tracking-normal font-normal text-left"
             >
               <div className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-[#E75A3B]" />
+                <ShieldCheck className="w-5 h-5 text-volt" />
                 <div className="text-xs">
-                  <span className="font-bold text-[#1C1B18] block">Maintainer Email</span>
-                  <span className="text-[#6E6C64]">shaurya@example.com</span>
+                  <span className="np-mono font-bold uppercase block">On-Chain</span>
+                  <span className="text-ink-soft">Audit the protocol directly on Stellar Expert</span>
                 </div>
               </div>
-              <ExternalLink className="w-4 h-4 text-[#6E6C64] group-hover:text-[#1C1B18] transition-colors" />
+              <ExternalLink className="w-4 h-4 flex-shrink-0" />
             </a>
-
-            {/* Maintainer handle */}
-            <div className="p-4 bg-[#FAF9F5] border border-[#EBE9E1] rounded-2xl flex items-center gap-3">
-              <HelpCircle className="w-5 h-5 text-[#E75A3B]" />
-              <div className="text-xs text-[#6E6C64]">
-                <span className="font-bold text-[#1C1B18] block">Project Maintainer Handle</span>
-                <span>GitHub: @shaurya-garg</span>
-              </div>
-            </div>
           </div>
         </div>
-
       </div>
-
     </div>
   );
 }

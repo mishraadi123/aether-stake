@@ -1,121 +1,132 @@
 "use client";
 
-import { useWallet } from "../../context/WalletContext";
-import { fromStroops } from "../../utils/stellar";
-import { ExternalLink, Trophy, HelpCircle, ShieldCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useAetherWallet } from "../../modules/wallet/WalletProvider";
+import { queryCycleDetails, convertStroopsToXlm } from "../../core/stellar/client";
+import { ExternalLink, Loader2, Radio } from "lucide-react";
+import Link from "next/link";
+
+const STATUS_META = {
+  0: { label: "Voided", chip: "np-chip-alarm" },
+  1: { label: "Active", chip: "np-chip-acid" },
+  2: { label: "Resolved", chip: "np-chip-volt" },
+};
 
 export default function Rounds() {
-  const { roundInfo, currentRoundId } = useWallet();
+  const { activeCycleSequence } = useAetherWallet();
+  const [cycles, setCycles] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const mockRounds = [
-    {
-      round_id: 1,
-      pot: 5000000000n, // 500 XLM
-      ticket_count: 5,
-      winner: "GAKF7GXDBJS2MMMVFHE4UNEKXJM3BABM3DQCSTF3JKRKN5WZI4GW4TIV",
-      settle_tx: "f7e84e817952f2be2f9b4a3984311831e8eb09e6a7b3b365f9282df743eb55f7",
-      status: 2 // settled
+  // Query every cycle 1..active straight from the contract — no cached or
+  // mocked history. Each row is a live read of on-chain persistent storage.
+  useEffect(() => {
+    if (!activeCycleSequence) {
+      setLoading(activeCycleSequence === 0 ? false : true);
+      if (activeCycleSequence === 0) setCycles([]);
+      return;
     }
-  ];
+    let cancelled = false;
+    (async () => {
+      try {
+        const ids = Array.from({ length: activeCycleSequence }, (_, i) => i + 1);
+        const details = await Promise.all(ids.map((id) => queryCycleDetails(id).catch(() => null)));
+        if (!cancelled) setCycles(details.filter(Boolean).reverse());
+      } catch (err) {
+        console.warn("cycle history fetch failed", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCycleSequence]);
 
   return (
-    <div className="max-w-4xl mx-auto w-full py-6 flex flex-col gap-8 animate-fade-in">
-      
-      <div>
-        <h2 className="text-2xl font-black text-[#1C1B18]">Round History & Audits</h2>
-        <p className="text-xs text-[#6E6C64] mt-1">
-          Complete transparent log of all finished timed rounds. Every settlement draw is verifiable on-chain.
-        </p>
-      </div>
-
-      <div className="bg-white border border-[#EBE9E1] rounded-3xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#FAF9F5] border-b border-[#EBE9E1] text-[10px] uppercase font-bold text-[#6E6C64] tracking-wider">
-                <th className="py-4 px-6">Round</th>
-                <th className="py-4 px-6">Jackpot (XLM)</th>
-                <th className="py-4 px-6">Tickets</th>
-                <th className="py-4 px-6">Winner Address</th>
-                <th className="py-4 px-6">Draw Hash</th>
-                <th className="py-4 px-6 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="text-xs divide-y divide-[#FAF9F5]">
-              
-              {/* Highlight Active Round from Context */}
-              {roundInfo.round_id > 0 && (
-                <tr className="bg-[#FFFDF9] font-semibold text-[#1C1B18]">
-                  <td className="py-4 px-6 font-bold">
-                    #{roundInfo.round_id}
-                  </td>
-                  <td className="py-4 px-6 text-[#E75A3B] font-extrabold">
-                    {fromStroops(BigInt(roundInfo.pot))} XLM
-                  </td>
-                  <td className="py-4 px-6">
-                    {roundInfo.ticket_count} sold
-                  </td>
-                  <td className="py-4 px-6 font-mono opacity-60">
-                    {roundInfo.winner ? `${roundInfo.winner.slice(0, 6)}...${roundInfo.winner.slice(-4)}` : "Pending draw"}
-                  </td>
-                  <td className="py-4 px-6 font-mono text-[#E75A3B]">
-                    --
-                  </td>
-                  <td className="py-4 px-6 text-right">
-                    <span className="text-[10px] font-bold text-white bg-[#378E56] px-2 py-0.5 rounded-md">
-                      Active
-                    </span>
-                  </td>
-                </tr>
-              )}
-
-              {/* Render Historical Rounds */}
-              {mockRounds.map((round) => (
-                <tr key={round.round_id} className="text-[#6E6C64] hover:bg-[#FAF9F5]/40 transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1C1B18]">
-                    #{round.round_id}
-                  </td>
-                  <td className="py-4 px-6 font-semibold text-[#1C1B18]">
-                    {fromStroops(round.pot)} XLM
-                  </td>
-                  <td className="py-4 px-6">
-                    {round.ticket_count} tickets
-                  </td>
-                  <td className="py-4 px-6 font-mono text-[#1C1B18]">
-                    <a
-                      href={`https://stellar.expert/explorer/testnet/account/${round.winner}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline flex items-center gap-1 inline-flex hover:text-[#E75A3B]"
-                    >
-                      {round.winner.slice(0, 6)}...{round.winner.slice(-4)}
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </td>
-                  <td className="py-4 px-6 font-mono">
-                    <a
-                      href={`https://stellar.expert/explorer/testnet/tx/${round.settle_tx}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline text-[#E75A3B] flex items-center gap-1 inline-flex"
-                    >
-                      {round.settle_tx.slice(0, 8)}...
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </td>
-                  <td className="py-4 px-6 text-right">
-                    <span className="text-[10px] font-bold bg-[#FAF9F5] border border-[#EBE9E1] px-2 py-0.5 rounded-md text-[#1C1B18]">
-                      Settled
-                    </span>
-                  </td>
-                </tr>
-              ))}
-
-            </tbody>
-          </table>
+    <div className="max-w-4xl mx-auto w-full flex flex-col gap-6 animate-fade-in">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="np-display text-2xl sm:text-3xl">Cycle ledger</h1>
+          <p className="np-mono text-[11px] uppercase tracking-wider text-ink-soft mt-1.5">
+            Every cycle, read live from contract storage
+          </p>
         </div>
+        <Link href="/activity" className="np-btn np-btn-ghost text-[10px] px-3 py-2 inline-flex items-center gap-1.5">
+          <Radio className="w-3.5 h-3.5" />
+          Draw txs in live feed
+        </Link>
       </div>
 
+      {loading ? (
+        <div className="np-card p-10 text-center">
+          <Loader2 className="w-6 h-6 mx-auto mb-3 animate-spin text-volt" />
+          <p className="np-mono text-[11px] uppercase tracking-wider text-ink-soft">
+            Reading cycle history from the pool contract…
+          </p>
+        </div>
+      ) : cycles.length === 0 ? (
+        <div className="np-card p-10 text-center">
+          <p className="np-display text-sm mb-2">No cycles yet</p>
+          <p className="text-xs text-ink-soft">
+            The protocol hasn&apos;t opened its first sweepstakes cycle. History will
+            populate here the moment it does.
+          </p>
+        </div>
+      ) : (
+        <div className="np-card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[560px]">
+              <thead>
+                <tr className="bg-ink text-bone">
+                  {["Cycle", "Pool (XLM)", "Entries", "Winner", "Status"].map((h) => (
+                    <th key={h} className="np-mono text-[10px] uppercase tracking-[0.15em] font-bold py-3 px-4 sm:px-5">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cycles.map((cycle, i) => {
+                  const status = STATUS_META[cycle.status] || STATUS_META[1];
+                  return (
+                    <tr key={cycle.round_id} className={`text-xs ${i < cycles.length - 1 ? "border-b-2 border-ink" : ""} hover:bg-bone transition-colors`}>
+                      <td className="py-3.5 px-4 sm:px-5 np-mono font-bold">#{cycle.round_id}</td>
+                      <td className="py-3.5 px-4 sm:px-5 np-mono font-tabular font-bold text-volt">
+                        {convertStroopsToXlm(BigInt(cycle.pot))}
+                      </td>
+                      <td className="py-3.5 px-4 sm:px-5 np-mono font-tabular">{cycle.ticket_count}</td>
+                      <td className="py-3.5 px-4 sm:px-5 np-mono">
+                        {cycle.winner ? (
+                          <a
+                            href={`https://stellar.expert/explorer/testnet/account/${cycle.winner}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-volt transition-colors inline-flex items-center gap-1"
+                          >
+                            {cycle.winner.slice(0, 5)}…{cycle.winner.slice(-4)}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-ink-soft">—</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 sm:px-5">
+                        <span className={`np-chip ${status.chip}`}>{status.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <p className="np-mono text-[10px] uppercase tracking-wider text-ink-soft text-center">
+        Draw transaction hashes for resolved cycles appear in the{" "}
+        <Link href="/activity" className="text-volt hover:underline">live feed</Link>{" "}
+        with direct Stellar Expert links.
+      </p>
     </div>
   );
 }
